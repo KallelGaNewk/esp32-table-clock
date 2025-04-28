@@ -119,6 +119,8 @@ void setupServer()
               { server.send(200, "text/html", htmlForm); });
     server.on("/save", HTTP_POST, handleSave);
     server.on("/status", HTTP_GET, handleStatus);
+    server.onNotFound([]()
+              { server.send(404, "text/plain", "Not Found"); });
     server.begin();
 }
 

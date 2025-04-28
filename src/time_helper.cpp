@@ -1,58 +1,57 @@
 #include <RtcDS1302.h>
+#include "time_helper.h"
 
 ThreeWire myWire(4, 5, 2); // DAT/IO, CLK/SCLK, RST/CE
 RtcDS1302<ThreeWire> Rtc(myWire);
+bool needsBatteryReplacement = false;
 
-RtcDateTime getNTPTime() {
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+RtcDateTime getNTPTime()
+{
+    configTime(0, 0, NTP_SERVER_1, NTP_SERVER_2);
     struct tm timeinfo;
     if (!getLocalTime(&timeinfo, 10000))
     {
+        Serial.println("Failed to obtain time from NTP server");
         return RtcDateTime(__DATE__, __TIME__);
     }
+
+    time_t now;
+    time(&now);
+    now += TIMEZONE_OFFSET * 3600; // Adjust for timezone offset
+    gmtime_r(&now, &timeinfo);
+
+    Serial.println("NTP time obtained successfully");
+    Serial.printf("Current time: %04d-%02d-%02d %02d:%02d:%02d\n",
+                  timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                  timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
 
     return RtcDateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
                        timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
 }
 
-void checkRTC() {
+void checkRTC()
+{
     RtcDateTime ntpTime = getNTPTime();
 
-    if (!Rtc.IsDateTimeValid())
-    {
-        // Common Causes:
-        //    1) first time you ran and the device wasn't running yet
-        //    2) the battery on the device is low or even missing
-
-        Serial.println("RTC lost confidence in the DateTime!");
-        Rtc.SetDateTime(ntpTime);
+    if (!Rtc.IsDateTimeValid()) {
+        needsBatteryReplacement = true;
     }
-
-    if (Rtc.GetIsWriteProtected())
-    {
-        Serial.println("RTC was write protected, enabling writing now");
+    if (Rtc.GetIsWriteProtected()) {
         Rtc.SetIsWriteProtected(false);
     }
-
-    if (!Rtc.GetIsRunning())
-    {
-        Serial.println("RTC was not actively running, starting now");
+    if (!Rtc.GetIsRunning()) {
         Rtc.SetIsRunning(true);
     }
 
+    if (ntpTime == RtcDateTime(__DATE__, __TIME__)) return; // ntpTime is not valid
+
     RtcDateTime now = Rtc.GetDateTime();
-    if (now < ntpTime)
+    int32_t timeDifference = now.TotalSeconds() - ntpTime.TotalSeconds();
+
+    if (abs(timeDifference) > TIME_THRESHOLD)
     {
-        Serial.println("RTC is older than compile time! (Updating DateTime)");
+        Serial.printf("RTC time differs by %d seconds from NTP time! (Updating DateTime)\n", timeDifference);
         Rtc.SetDateTime(ntpTime);
-    }
-    else if (now > ntpTime)
-    {
-        Serial.println("RTC is newer than compile time. (this is expected)");
-    }
-    else if (now == ntpTime)
-    {
-        Serial.println("RTC is the same as compile time! (not expected but all is fine)");
     }
 }
 

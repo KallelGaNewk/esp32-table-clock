@@ -29,15 +29,9 @@ void setup()
   display.setCursor(0, 0);
 
   display.setTextSize(2);
-  display.println(F("Table Clock"));
+  display.println(F("TableClock"));
 
   display.setTextSize(1);
-  display.println(F("Rtc setup..."));
-  display.display();
-
-  Rtc.Begin();
-  checkRTC();
-
   display.println(F("Sensor setup..."));
   display.display();
 
@@ -52,6 +46,12 @@ void setup()
   display.display();
 
   setupWiFi();
+
+  display.println(F("Rtc setup..."));
+  display.display();
+
+  Rtc.Begin();
+  checkRTC();
 
   display.clearDisplay();
 
